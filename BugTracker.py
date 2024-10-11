@@ -1,48 +1,48 @@
-# TODO login 
-# TODO połączenie z bazą danych
-# TODO test
 
-import psycopg3
+# TODO dodać sprawdzanie czy tabela 'bugs' istnieje
+# TODO dodać sprawdzanie czy typ 'status' istnieje
+
+import psycopg
 import datetime
 import sys
 
-def login():
-    pass
-
-def create_database():
-    pass
 
 def connect_to_database():
-    conn = psycopg3.connect()
-    cur = conn.cursor()
+    password = input("Enter your password: ")
 
-    return cur
+    conn = psycopg.connect("dbname=bugtracker user=postgres password=" + password)
+    # cur = conn.cursor()
 
-def create_table(cur):
+    return conn
+
+def create_table(cur, conn):
+    cur.execute(
+        """CREATE TYPE status AS ENUM('unsolved', 'in progress', 'solved');"""
+    )
     cur.execute(
         """CREATE TABLE bugs(
             id SERIAL PRIMARY KEY NOT NULL,
             name VARCHAR NOT NULL,
-            date DATETIME,
+            date TIMESTAMP,
             description VARCHAR,
-            status ENUM(unsolved, in progress, solved) NOT NULL
+            status STATUS NOT NULL
         );"""
     )
     
-    cur.commit()
+    conn.commit()
 
 
-def add_entry(cur):
-    date = datetime.now()
-    name = input("Enter bug name")
-    desc = input("Enter bug description")
+def add_entry(cur, conn):
+    date = datetime.datetime.now()
+    name = input("Enter bug name:\n")
+    desc = input("Enter bug description:\n")
     cur.execute(
         """INSERT INTO bugs (name, date, description, status)
         VALUES (%s, %s, %s, %s)""",
-        (name, date, desc, "in progress")
+        (name, date, desc, "unsolved")
     )
 
-    cur.commit()
+    conn.commit()
 
 
 def display_list(cur):
@@ -55,50 +55,58 @@ def display_list(cur):
 
 
 def display_entry(cur):
-    entry_id = input("Select entry to display")
+    entry_id = input("Select entry to display\n")
     
     cur.execute(
-        """SELECT * FROM bugs WHERE id = %s""",
-        (entry_id)
+        """SELECT * FROM bugs WHERE id = %s;""",
+        (entry_id,)
     )
+    
+    for entry in cur:
+        print(entry)
 
-    print(cur)
 
+def modify_entry(cur, conn):
+    entry_id = int(input("Select entry to modify\n"))
 
-def modify_entry(cur):
-    entry_id = input("Select entry to modify")
-
-    if input("[1]change name\n[2] change description") == "1":
-        column = "name"
+    if input("[1] change name\n[2] change description\n") == "1":
         new_value = input("enter new name")
-    else:
-        column = "description"
-        new_value = input("enter new description")
-
-    cur.execute(
+        
+        cur.execute(
         """UPDATE bugs
-        SET %s = %s
+        SET name = %s
         WHERE id = %s;
         """,
-        (column, new_value, entry_id)
-    )
+        (new_value, entry_id)
+        )
 
-    cur.commit()
+    else:
+        new_value = input("enter new description")
+
+        cur.execute(
+            """UPDATE bugs
+            SET description = %s
+            WHERE id = %s;
+            """,
+            (new_value, entry_id)
+        )
+
+    conn.commit()
 
 
 def remove_entry(cur):
-    entry_id = input("Select entry to remove")
+    entry_id = int(input("Select entry to remove\n"))
 
     cur.execute(
         """DELETE FROM bugs WHERE id = %s""",
-        (entry_id)
+        (entry_id,)
     )
 
 
-def update_status(cur):
-    entry_id = input("Select entry to modify")
+def update_status(cur, conn):
+    entry_id = int(input("Select entry to modify\n"))
 
-    if input("[1] mark entry in progress\n[2] mark entry solved") == "1":
+    if input("[1] mark entry in progress\n[2] mark entry solved\n") == "1":
         new_status = "in progress"
     else:
         new_status = "solved"
@@ -111,13 +119,10 @@ def update_status(cur):
         (new_status, entry_id)
     )
 
-###
+    conn.commit()
 
 
-
-cursor = connect_to_database()
-
-def menu():
+def menu(cursor, conn):
     while(True):
         option = input(
             """Select an option:
@@ -127,7 +132,7 @@ def menu():
             [4] Modify entry
             [5] Remove entry
             [6] Change entry status
-            [0] Exit"""
+            [0] Exit\n"""
         )
 
         match (option):
@@ -136,13 +141,13 @@ def menu():
             case "2":
                 display_entry(cursor)
             case "3":
-                add_entry(cursor)
+                add_entry(cursor, conn)
             case "4":
-                modify_entry(cursor)
+                modify_entry(cursor, conn)
             case "5":
                 remove_entry(cursor)
             case "6":
-                update_status(cursor)
+                update_status(cursor, conn)
             case "7":
                 pass
             case "8":
@@ -151,3 +156,12 @@ def menu():
                 pass
             case "0":
                 sys.exit()
+
+### PROGRAM CODE ###
+
+conn = connect_to_database()
+cursor = conn.cursor()
+
+# create_table(cursor, conn)
+
+menu(cursor, conn)
